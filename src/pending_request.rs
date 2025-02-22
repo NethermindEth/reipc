@@ -6,7 +6,7 @@ use crossbeam::channel::{self, Receiver, Sender};
 pub struct PendingRequest {
     pub(crate) notify: Sender<Response>,
     #[cfg(feature = "metrics")]
-    sent_on: Instant,
+    pub(crate) sent_on: Instant,
 }
 
 impl PendingRequest {

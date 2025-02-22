@@ -1,5 +1,8 @@
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -23,6 +26,12 @@ pub(crate) struct ReManager {
 
     #[cfg(feature = "metrics")]
     send_to_metrics_channel: Sender<Option<Duration>>,
+
+    #[cfg(feature = "metrics")]
+    timed_out_requests: Arc<DashMap<Id, Instant>>,
+
+    #[cfg(feature = "metrics")]
+    timed_out_req_count: Arc<AtomicU64>,
 }
 
 impl ReManager {
@@ -46,6 +55,8 @@ impl ReManager {
             to_send: send,
             send_to_metrics_channel,
             requests: Arc::new(DashMap::new()),
+            timed_out_requests: Arc::new(DashMap::new()),
+            timed_out_req_count: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -70,6 +81,8 @@ impl ReManager {
 
         #[cfg(not(feature = "metrics"))]
         let manager = ReManager::new(connection, sender);
+        #[cfg(feature = "metrics")]
+        let timed_out_requests = manager.timed_out_req_count.clone();
 
         let (rec, send) = (manager.clone(), manager.clone());
 
@@ -86,7 +99,7 @@ impl ReManager {
 
         #[cfg(feature = "metrics")]
         thread::spawn(move || {
-            ReManager::metrics_loop(metrics_recv);
+            ReManager::metrics_loop(metrics_recv, timed_out_requests);
         });
 
         //TODO: this is FUGLY fix it
@@ -123,7 +136,12 @@ impl ReManager {
             Err(e) => {
                 //TODO: add retry logic
                 //In case of timeout drop the request
-                self.requests.remove(&del_id);
+                if let Some((_, r)) = self.requests.remove(&del_id) {
+                    #[cfg(feature = "metrics")]
+                    self.timed_out_requests.insert(del_id, r.sent_on);
+                    #[cfg(feature = "metrics")]
+                    self.timed_out_req_count.fetch_add(1, Ordering::Relaxed);
+                }
                 return Err(e.into());
             }
         };
@@ -151,6 +169,16 @@ impl ReManager {
                 let _ = self
                     .send_to_metrics_channel
                     .send(Some(pending_req.record_metric()));
+                continue;
+            }
+
+            // reqtuest maybe timed out
+            #[cfg(feature = "metrics")]
+            if let Some((_, timed_out_req)) = self.timed_out_requests.remove(&resp.id) {
+                #[cfg(feature = "metrics")]
+                let _ = self
+                    .send_to_metrics_channel
+                    .send(Some(timed_out_req.elapsed()));
             }
         }
 
@@ -177,7 +205,10 @@ impl ReManager {
     }
 
     #[cfg(feature = "metrics")]
-    fn metrics_loop(recv_metircs: channel::Receiver<Option<Duration>>) {
+    fn metrics_loop(
+        recv_metircs: channel::Receiver<Option<Duration>>,
+        timed_out_req_count: Arc<AtomicU64>,
+    ) {
         let mut last_time_logged = Instant::now();
         // range is from 1 micro_sec to 1s (1000 micro sec in 1 milisec and 1000 milisec in 1 sec)
         let mut histogram: Histogram<u64> =
@@ -209,6 +240,7 @@ impl ReManager {
                            * 95%ile: {}μs
                            * 99%ile: {}μs
                            * 99.9%ile: {}μs
+                           * Requestst that timed out: {}
                        ****************************************************
                        ****************************************************"#,
                     histogram.max(),
@@ -217,7 +249,8 @@ impl ReManager {
                     histogram.value_at_quantile(0.9),
                     histogram.value_at_quantile(0.95),
                     histogram.value_at_quantile(0.99),
-                    histogram.value_at_quantile(0.999)
+                    histogram.value_at_quantile(0.999),
+                    timed_out_req_count.load(Ordering::Relaxed),
                 );
                 println!("{}", f);
                 last_time_logged = Instant::now();
