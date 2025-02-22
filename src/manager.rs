@@ -200,13 +200,13 @@ impl ReManager {
                 let f = format!(
                     r#"*************************************************
                        *************************************************
-                           * MAX: {} micro_sec
-                           * MEDIAN: {} micro_sec
-                           * AVERAGE: {} micro_sec
+                           * MAX: {}μs
+                           * MEDIAN: {}μs
+                           * AVERAGE: {:.2}μs
                            * TAIL LATENCY:
-                           * 90%ile: {} micro_sec
-                           * 95%ile: {} micro_sec
-                           * 99%ile: {} micro_sec
+                           * 90%ile: {}μs
+                           * 95%ile: {}μs
+                           * 99.9%ile: {}μs
                        ****************************************************
                        ****************************************************"#,
                     histogram.max(),
@@ -215,6 +215,7 @@ impl ReManager {
                     histogram.value_at_quantile(0.9),
                     histogram.value_at_quantile(0.95),
                     histogram.value_at_quantile(0.99)
+                    histogram.value_at_quantile(0.999)
                 );
                 println!("{}", f);
                 last_time_logged = Instant::now();
