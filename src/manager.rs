@@ -7,6 +7,7 @@ use std::{
 use alloy_json_rpc::{Id, Response, SerializedRequest};
 use crossbeam::channel::{self, Sender};
 use dashmap::DashMap;
+#[cfg(feature = "metrics")]
 use hdrhistogram::Histogram;
 
 use crate::{
@@ -206,6 +207,7 @@ impl ReManager {
                            * TAIL LATENCY:
                            * 90%ile: {}μs
                            * 95%ile: {}μs
+                           * 99%ile: {}μs
                            * 99.9%ile: {}μs
                        ****************************************************
                        ****************************************************"#,
@@ -214,7 +216,7 @@ impl ReManager {
                     histogram.mean(),
                     histogram.value_at_quantile(0.9),
                     histogram.value_at_quantile(0.95),
-                    histogram.value_at_quantile(0.99)
+                    histogram.value_at_quantile(0.99),
                     histogram.value_at_quantile(0.999)
                 );
                 println!("{}", f);
