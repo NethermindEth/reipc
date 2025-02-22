@@ -3,6 +3,9 @@ name = "reipc"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+metrics = ["dep:hdrhistogram"]
+
 [dependencies]
 alloy-json-rpc = "0.11.1"
 alloy-primitives = { version = "0.8.15", default-features = false }
@@ -13,6 +16,7 @@ dashmap = "6.1.0"
 serde = { version = "1.0.210" }
 serde_json = { version = "1.0.128" }
 thiserror = "1.0.64"
+hdrhistogram = {version = "7.5.4", optional = true}
 
 [dev-dependencies]
 tempfile = "3.16.0"
