@@ -267,7 +267,7 @@ impl ReManager {
                 let timed_out_count = timed_out_req_count.load(Ordering::Relaxed) as f64;
                 let total_req_count = total_req_count.load(Ordering::Relaxed);
 
-                let requests_per_sec = (total_req_count as f64) / elapsed_since_start as f64;
+                let requests_per_sec = (total_req_count as f64) / elapsed_as_sec as f64;
                 let f = format!(
                     r#"*************************************************
                        *************************************************
