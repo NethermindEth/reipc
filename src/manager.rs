@@ -12,6 +12,8 @@ use crossbeam::channel::{self, Sender};
 use dashmap::DashMap;
 #[cfg(feature = "metrics")]
 use hdrhistogram::Histogram;
+#[cfg(feature = "metrics")]
+use num_format::{Locale, ToFormattedString};
 
 use crate::{
     connection::IpcConnectionHandle, errors::TransportError, pending_request::PendingRequest,
@@ -84,6 +86,8 @@ impl ReManager {
 
         #[cfg(not(feature = "metrics"))]
         let manager = ReManager::new(connection, sender);
+
+        #[cfg(feature = "metrics")]
         thread::spawn({
             let manager = manager.clone();
             move || {
@@ -254,7 +258,7 @@ impl ReManager {
             let log_on_interval = last_time_logged.elapsed().as_secs() >= 180;
             if log_on_interval {
                 let timed_out_count = timed_out_req_count.load(Ordering::Relaxed) as f64;
-                let total_req_count = total_req_count.load(Ordering::Relaxed) as f64;
+                let total_req_count = total_req_count.load(Ordering::Relaxed);
                 let f = format!(
                     r#"*************************************************
                        *************************************************
@@ -278,11 +282,11 @@ impl ReManager {
                     (histogram.value_at_quantile(0.99) as f64) / 1000.0,
                     (histogram.value_at_quantile(0.999) as f64) / 1000.0,
                     timed_out_count,
-                    total_req_count,
-                    (100.0 * timed_out_count) / total_req_count,
-                    total_failed_req_count,
-                    total_req_count,
-                    (100.0 * total_failed_req_count) / total_req_count
+                    total_req_count.to_formatted_string(&Locale::en),
+                    (100.0 * timed_out_count) / total_req_count as f64,
+                    total_req_count.to_formatted_string(&Locale::en),
+                    total_req_count.to_formatted_string(&Locale::en),
+                    (100.0 * total_failed_req_count) / total_req_count as f64,
                 );
                 println!("{}", f);
                 last_time_logged = Instant::now();

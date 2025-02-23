@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-metrics = ["dep:hdrhistogram"]
+metrics = ["dep:hdrhistogram", "dep:num-format"]
 
 [dependencies]
 alloy-json-rpc = "0.11.1"
