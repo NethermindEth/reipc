@@ -226,6 +226,7 @@ impl ReManager {
         timed_out_req_count: Arc<AtomicU64>,
         total_req_count: Arc<AtomicU64>,
     ) {
+        let started = Instant::now();
         let mut last_time_logged = Instant::now();
         // range is from 1 micro_sec to 1s (1000 micro sec in 1 milisec and 1000 milisec in 1 sec)
         let mut histogram: Histogram<u64> =
@@ -252,16 +253,26 @@ impl ReManager {
                 timed_out_req.retain(|_, req| req.elapsed() < threshold);
                 before_cleanup - timed_out_req.len()
             };
-
             total_failed_req_count += failed_req_count as f64;
 
             let log_on_interval = last_time_logged.elapsed().as_secs() >= 180;
             if log_on_interval {
+                let elapsed_as_sec = started.elapsed().as_secs();
+                let (elapsed_since_start, unit) = match elapsed_as_sec {
+                    0..60 => (elapsed_as_sec, "s"),
+                    60..3600 => (elapsed_as_sec / 60, "min"),
+                    _ => (elapsed_as_sec / 3600, "hrs"),
+                };
+
                 let timed_out_count = timed_out_req_count.load(Ordering::Relaxed) as f64;
                 let total_req_count = total_req_count.load(Ordering::Relaxed);
+
+                let requests_per_sec = (total_req_count as f64) / elapsed_since_start as f64;
                 let f = format!(
                     r#"*************************************************
                        *************************************************
+                           * Duration: {}{}
+                           * Requests per sec: {:.2}
                            * MAX: {:.2}ms
                            * MEDIAN: {}μs
                            * AVERAGE: {:.2}μs
@@ -270,10 +281,13 @@ impl ReManager {
                            * 95%ile: {}μs
                            * 99%ile: {:.2}ms
                            * 99.9%ile: {:.2}ms
-                           * Requestst that timed out: {} / {}: {:.3}%
-                           * Failed requests: {} / {}: {}%
+                           * Requests that timed out: {} / {}: {:.3}%
+                           * Failed requests: {} / {}: {:.3}%
                        ****************************************************
                        ****************************************************"#,
+                    elapsed_since_start,
+                    unit,
+                    requests_per_sec,
                     (histogram.max() as f64) / 1000.0,
                     histogram.value_at_quantile(0.5),
                     histogram.mean(),
