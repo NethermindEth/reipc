@@ -284,7 +284,7 @@ impl ReManager {
                     timed_out_count,
                     total_req_count.to_formatted_string(&Locale::en),
                     (100.0 * timed_out_count) / total_req_count as f64,
-                    total_req_count.to_formatted_string(&Locale::en),
+                    total_failed_req_count,
                     total_req_count.to_formatted_string(&Locale::en),
                     (100.0 * total_failed_req_count) / total_req_count as f64,
                 );
