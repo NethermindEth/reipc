@@ -84,10 +84,17 @@ impl ReManager {
 
         #[cfg(not(feature = "metrics"))]
         let manager = ReManager::new(connection, sender);
-        #[cfg(feature = "metrics")]
-        let timed_out_requests = manager.timed_out_req_count.clone();
-        #[cfg(feature = "metrics")]
-        let total_requests = manager.total_req_count.clone();
+        thread::spawn({
+            let manager = manager.clone();
+            move || {
+                ReManager::metrics_loop(
+                    metrics_recv,
+                    manager.timed_out_requests,
+                    manager.timed_out_req_count,
+                    manager.total_req_count,
+                );
+            }
+        });
 
         let (rec, send) = (manager.clone(), manager.clone());
 
@@ -100,11 +107,6 @@ impl ReManager {
         let send_jh = thread::spawn(move || -> Result<(), TransportError> {
             send.send_loop(receiver)?;
             Ok(())
-        });
-
-        #[cfg(feature = "metrics")]
-        thread::spawn(move || {
-            ReManager::metrics_loop(metrics_recv, timed_out_requests, total_requests);
         });
 
         //TODO: this is FUGLY fix it
@@ -216,6 +218,7 @@ impl ReManager {
     #[cfg(feature = "metrics")]
     fn metrics_loop(
         recv_metircs: channel::Receiver<Option<Duration>>,
+        timed_out_req: Arc<DashMap<Id, Instant>>,
         timed_out_req_count: Arc<AtomicU64>,
         total_req_count: Arc<AtomicU64>,
     ) {
@@ -225,6 +228,7 @@ impl ReManager {
             hdrhistogram::Histogram::new_with_bounds(1, 1000 * 1000, 3)
                 .expect("Failed to create histogram");
 
+        let mut total_failed_req_count = 0.0;
         while let Ok(Some(duration)) = recv_metircs.recv() {
             if let Ok(d) = duration.as_micros().try_into() {
                 if let Err(e) = histogram.record(d) {
@@ -237,34 +241,48 @@ impl ReManager {
                 );
             }
 
+            let failed_req_count = {
+                let threshold = Duration::from_secs(3);
+                // Not completely accurate due to Dashmap nature, but will do for our tests
+                let before_cleanup = timed_out_req.len();
+                timed_out_req.retain(|_, req| req.elapsed() < threshold);
+                before_cleanup - timed_out_req.len()
+            };
+
+            total_failed_req_count += failed_req_count as f64;
+
             let log_on_interval = last_time_logged.elapsed().as_secs() >= 180;
             if log_on_interval {
-                let timed_out = timed_out_req_count.load(Ordering::Relaxed) as f64;
+                let timed_out_count = timed_out_req_count.load(Ordering::Relaxed) as f64;
                 let total_req_count = total_req_count.load(Ordering::Relaxed) as f64;
                 let f = format!(
                     r#"*************************************************
                        *************************************************
-                           * MAX: {}μs
+                           * MAX: {:.2}ms
                            * MEDIAN: {}μs
                            * AVERAGE: {:.2}μs
                            * TAIL LATENCY:
                            * 90%ile: {}μs
                            * 95%ile: {}μs
-                           * 99%ile: {}μs
-                           * 99.9%ile: {}μs
-                           * Requestst that timed out: {} / {}: {}%
+                           * 99%ile: {:.2}ms
+                           * 99.9%ile: {:.2}ms
+                           * Requestst that timed out: {} / {}: {:.3}%
+                           * Failed requests: {} / {}: {}%
                        ****************************************************
                        ****************************************************"#,
-                    histogram.max(),
+                    (histogram.max() as f64) / 1000.0,
                     histogram.value_at_quantile(0.5),
                     histogram.mean(),
                     histogram.value_at_quantile(0.9),
                     histogram.value_at_quantile(0.95),
-                    histogram.value_at_quantile(0.99),
-                    histogram.value_at_quantile(0.999),
-                    timed_out,
+                    (histogram.value_at_quantile(0.99) as f64) / 1000.0,
+                    (histogram.value_at_quantile(0.999) as f64) / 1000.0,
+                    timed_out_count,
                     total_req_count,
-                    (100f64 * timed_out) / total_req_count
+                    (100.0 * timed_out_count) / total_req_count,
+                    total_failed_req_count,
+                    total_req_count,
+                    (100.0 * total_failed_req_count) / total_req_count
                 );
                 println!("{}", f);
                 last_time_logged = Instant::now();
