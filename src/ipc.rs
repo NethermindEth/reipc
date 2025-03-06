@@ -42,7 +42,9 @@ where
         // max code size is just under 25kb
         // since the code is specific to rbuilder, I'm immediately taking 25kb
         // yeah I know that 1024 * 25 i actually KiB not kB
-        const INTERNAL_READ_BUF_CAPACITY: usize = 1024 * 25;
+        // NOTE: using 4096 * 7 since it is smallest multiple of 4096 bigger than 1024 * 25
+        // The reason I'm doing this is because page-size is usually 4096
+        const INTERNAL_READ_BUF_CAPACITY: usize = 4096 * 7;
 
         let (mut ipc_writer, mut ipc_reader) = (self.stream.try_clone()?, self.stream);
         let (connection_w, connection_r) = (self.connection.clone(), self.connection);
@@ -56,14 +58,6 @@ where
             //https://docs.rs/tokio-util/latest/tokio_util/io/fn.poll_read_buf.html
             let reader_result = 'reader: loop {
                 let dst = buf.chunk_mut();
-
-                // Ensure we have spare capacity to read more data.
-                let dst = if dst.len() > 0 {
-                    dst
-                } else {
-                    buf.reserve(INTERNAL_READ_BUF_CAPACITY);
-                    buf.chunk_mut()
-                };
                 let dst = unsafe { std::slice::from_raw_parts_mut(dst.as_mut_ptr(), dst.len()) };
 
                 // Read data from the IPC reader into the spare capacity.
