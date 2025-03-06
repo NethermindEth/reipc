@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use alloy_json_rpc::Response;
 use crossbeam::channel::{self, Receiver, Sender};
 
+#[derive(Debug)]
 pub struct PendingRequest {
     pub(crate) notify: Sender<Response>,
     #[cfg(feature = "metrics")]
