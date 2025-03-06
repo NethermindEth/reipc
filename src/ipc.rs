@@ -38,11 +38,7 @@ where
     }
 
     pub(crate) fn start(self) -> Result<IpcParallelRW, ConnectionError> {
-        // Per https://eips.ethereum.org/EIPS/eip-170
-        // max code size is just under 25kb
-        // since the code is specific to rbuilder, I'm immediately taking 25kb
-        // yeah I know that 1024 * 25 i actually KiB not kB
-        const INTERNAL_READ_BUF_CAPACITY: usize = 1024 * 25;
+        const INTERNAL_READ_BUF_CAPACITY: usize = 1024 * 1024;
 
         let (mut ipc_writer, mut ipc_reader) = (self.stream.try_clone()?, self.stream);
         let (connection_w, connection_r) = (self.connection.clone(), self.connection);
