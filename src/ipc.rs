@@ -39,7 +39,7 @@ where
 
     pub(crate) fn start(self) -> Result<IpcParallelRW, ConnectionError> {
         // 32MB
-        const INTERNAL_READ_BUF_CAPACITY: usize = 1024 * 1024 * 32;
+        const INTERNAL_READ_BUF_CAPACITY: usize = 4 * 1024 * 1024;
 
         let (mut ipc_writer, mut ipc_reader) = (self.stream.try_clone()?, self.stream);
         let (connection_w, connection_r) = (self.connection.clone(), self.connection);
