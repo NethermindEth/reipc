@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut, BytesMut};
 use std::{
-    io::{Read, Write},
+    io::{BufReader, Read, Write},
     net::Shutdown,
     os::unix::net::UnixStream,
     path::Path,
@@ -41,7 +41,8 @@ where
         // 32MB
         const INTERNAL_READ_BUF_CAPACITY: usize = 1024 * 1024 * 32;
 
-        let (mut ipc_writer, mut ipc_reader) = (self.stream.try_clone()?, self.stream);
+        let (mut ipc_writer, ipc_reader) = (self.stream.try_clone()?, self.stream);
+        let mut ipc_reader = BufReader::with_capacity(INTERNAL_READ_BUF_CAPACITY, ipc_reader);
         let (connection_w, connection_r) = (self.connection.clone(), self.connection);
 
         //Inspired by  alloy.rs async transport IPC implementation
@@ -110,7 +111,7 @@ where
             // The intention of this lib is to mimic request - response pattern
             // If we cannot receive any more responses, we close IPC completely
             // Will error if socket is no longer (or never was) connected, we don't care
-            let _ = ipc_reader.shutdown(Shutdown::Both);
+            //let _ = ipc_reader.shutdown(Shutdown::Both);
             reader_result
         });
 
