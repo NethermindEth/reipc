@@ -32,7 +32,7 @@ impl IpcConnection {
         //send_to_ipc is used by Manager to send request to IPC
         //send_to_ipc_rx is how IPC will receive this request
         //(to actually send it to IPC)
-        let (send_to_ipc, send_to_ipc_rx) = crossbeam::channel::unbounded();
+        let (send_to_ipc, send_to_ipc_rx) = crossbeam::channel::bounded(128);
         // recv_from_ipc used by Manager to receive response from IPC
         // recv_from_ipc_tx is how IPC will send response to Manager once it receives it
         let (recv_from_ipc_tx, recv_from_ipc) = crossbeam::channel::unbounded();
