@@ -77,7 +77,7 @@ impl ReManager {
         JoinHandle<Result<(), TransportError>>,
         JoinHandle<Result<(), TransportError>>,
     ) {
-        let (sender, receiver) = channel::bounded(128);
+        let (sender, receiver) = channel::unbounded();
 
         #[cfg(feature = "metrics")]
         let (metrics_send, metrics_recv) = channel::unbounded();
