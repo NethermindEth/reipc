@@ -35,7 +35,7 @@ impl IpcConnection {
 
         //NOTE: we only need to bound sender because we cannot receive more responses than requests
         //sent
-        let (send_to_ipc, send_to_ipc_rx) = crossbeam::channel::bounded(16);
+        let (send_to_ipc, send_to_ipc_rx) = crossbeam::channel::bounded(32);
         // recv_from_ipc used by Manager to receive response from IPC
         // recv_from_ipc_tx is how IPC will send response to Manager once it receives it
         let (recv_from_ipc_tx, recv_from_ipc) = crossbeam::channel::unbounded();
