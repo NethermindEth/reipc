@@ -8,6 +8,7 @@ use crate::ipc::{Ipc, IpcParallelRW};
 use crate::manager::ReManager;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct ReIPC {
     manager: ReManager,
     ipc_rw: IpcParallelRW,
